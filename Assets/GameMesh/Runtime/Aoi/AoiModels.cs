@@ -19,6 +19,11 @@ namespace GameMesh.Aoi
         public ulong StateSeq;
         public ulong MapInstanceId;
         public long ServerTimeMs;
+        /// <summary>Horizontal velocity (m/s). Filled when server GAMEMESH_AOI_EXTRAPOLATE=1.</summary>
+        public float Vx;
+        public float Vz;
+        /// <summary>Non-zero marks an active velocity segment (not the position epoch).</summary>
+        public long MoveStartMs;
     }
 
     public sealed class AoiDeltaDto
@@ -39,6 +44,9 @@ namespace GameMesh.Aoi
         public ulong StateSeq;
         public ulong MapInstanceId;
         public long ServerTimeMs;
+        public float Vx;
+        public float Vz;
+        public long MoveStartMs;
         /// <summary>Local tick of the last Enter or Move. Silence means a dropped LEAVE.</summary>
         public long LastLocalMs;
         /// <summary>Bumped on snapshot/ENTER replace so the view drops the old pose trail.</summary>
@@ -348,6 +356,9 @@ namespace GameMesh.Aoi
             dst.Yaw = src.Yaw;
             dst.Hp = src.Hp;
             dst.MaxHp = src.MaxHp;
+            dst.Vx = src.Vx;
+            dst.Vz = src.Vz;
+            dst.MoveStartMs = src.MoveStartMs;
             if (src.StateSeq != 0)
                 dst.StateSeq = src.StateSeq;
             dst.MapInstanceId = src.MapInstanceId;

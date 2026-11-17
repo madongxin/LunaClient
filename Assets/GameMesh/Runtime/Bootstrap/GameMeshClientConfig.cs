@@ -67,6 +67,11 @@ namespace GameMesh.Bootstrap
         public float moveFastSpeed = 6f;
         public int interpolationDelayMs = 280;
         public float aoiLeaveFadeSeconds = 0.2f;
+        /// <summary>
+        /// Observer velocity extrapolation from EntitySnapshot.vx/vz. Default off.
+        /// Open together with server GAMEMESH_AOI_EXTRAPOLATE=1 (same schema_sha256).
+        /// </summary>
+        public bool aoiExtrapolate;
         /// <summary>Delayed sampling of received AOI points. Default off; LEAVE still deletes immediately.</summary>
         public bool aoiInterpEnabled;
         public bool aoiInterpCoastEnabled;

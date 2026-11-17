@@ -422,6 +422,13 @@ namespace GameMesh.UI
             GUILayout.Label(
                 "A=8081  B=8083。不要填同一个口。连不上或 Hello 失败会自动换另一个口再登录。",
                 _hint);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("AOI外推", _label, GUILayout.Width(150));
+            client.Config.aoiExtrapolate = GUILayout.Toggle(
+                client.Config.aoiExtrapolate,
+                "aoi_extrapolate（默认关；需服 GAMEMESH_AOI_EXTRAPOLATE=1）",
+                GUILayout.Height(40));
+            GUILayout.EndHorizontal();
             client.LaunchArgs.DeviceId = Field("设备ID", client.LaunchArgs.DeviceId);
             client.LaunchArgs.DisplayName = Field("显示名", client.LaunchArgs.DisplayName);
             client.LaunchArgs.EnsureDefaultPassword();

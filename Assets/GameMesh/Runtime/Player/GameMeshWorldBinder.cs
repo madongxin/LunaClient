@@ -861,6 +861,11 @@ namespace GameMesh.Player
         float _lastAuthorityZ;
         float _lastAuthorityYaw;
         bool _hasAuthorityPose;
+        bool _velocityExtrapolating;
+        float _extrapVx;
+        float _extrapVz;
+        long _extrapEventServerTimeMs;
+        long _extrapMoveStartMs;
         ulong _playerId;
         int _dropOlderSeq;
         int _dropServerTime;
@@ -1195,6 +1200,11 @@ namespace GameMesh.Player
                 _clockOffset = double.NaN;
                 _hasLastSeg = false;
                 _hasAuthorityPose = false;
+                _velocityExtrapolating = false;
+                _extrapVx = 0f;
+                _extrapVz = 0f;
+                _extrapEventServerTimeMs = 0;
+                _extrapMoveStartMs = 0;
                 var settingsSnap = CurrentInterp();
                 var dx = state.X - transform.position.x;
                 var dz = state.Z - transform.position.z;
@@ -1291,10 +1301,46 @@ namespace GameMesh.Player
                 _hasAuthorityPose = true;
                 _target = next;
                 _targetYaw = state.Yaw;
-                // MOVE.position is the current authoritative destination. Update walks only
-                // along the received segment and stops on this point; it never extrapolates.
+                // Default: MOVE.position is the destination; Update walks the segment and stops.
+                // With aoiExtrapolate + MoveStartMs≠0 + speed: cover here, then coast by vx/vz.
+                ApplyVelocityExtrapolateState(state);
             }
 
+        }
+
+        void ApplyVelocityExtrapolateState(RemoteEntityState state)
+        {
+            var cfg = GameMeshClient.Instance != null ? GameMeshClient.Instance.Config : null;
+            var enabled = cfg != null && cfg.aoiExtrapolate;
+            if (state.ServerTimeMs != 0)
+                AoiVelocityClock.NoteAoiFrame(state.ServerTimeMs, AoiVelocityClock.LocalNowMs);
+
+            if (!AoiVelocityExtrapolate.ShouldExtrapolate(enabled, state.MoveStartMs, state.Vx, state.Vz))
+            {
+                _velocityExtrapolating = false;
+                _extrapVx = 0f;
+                _extrapVz = 0f;
+                _extrapMoveStartMs = 0;
+                _extrapEventServerTimeMs = 0;
+                // |v|≈0 with MoveStartMs set: park on this position (arrival_stop).
+                return;
+            }
+
+            // New frame: position covers the local display origin; refresh the velocity segment.
+            _extrapVx = state.Vx;
+            _extrapVz = state.Vz;
+            _extrapMoveStartMs = state.MoveStartMs;
+            _extrapEventServerTimeMs = state.ServerTimeMs != 0
+                ? state.ServerTimeMs
+                : _extrapEventServerTimeMs;
+            _velocityExtrapolating = _extrapEventServerTimeMs != 0 && AoiVelocityClock.HasBias;
+            if (_velocityExtrapolating)
+            {
+                // Snap render onto the new anchor this frame (no multi-second smooth pull-back).
+                var place = new Vector3(state.X,
+                    GroundY(state.X, state.Z, state.Y) + FootClearance, state.Z);
+                transform.position = place;
+            }
         }
 
         void UpdateLabel(RemoteEntityState state)
@@ -1412,6 +1458,51 @@ namespace GameMesh.Player
             var coasting = false;
             var intended = new Vector3(_lastAuthorityX, pos.y, _lastAuthorityZ);
             Vector3 next;
+            if (_velocityExtrapolating && AoiVelocityClock.HasBias && _extrapEventServerTimeMs != 0)
+            {
+                var est = AoiVelocityClock.EstServerNowMs(AoiVelocityClock.LocalNowMs);
+                AoiVelocityExtrapolate.Sample(
+                    _lastAuthorityX, _lastAuthorityZ,
+                    _extrapVx, _extrapVz,
+                    _extrapEventServerTimeMs, est,
+                    out var ex, out var ez);
+                intended = new Vector3(ex, pos.y, ez);
+                next = intended;
+                _chaseMetersPerSec = Mathf.Sqrt(_extrapVx * _extrapVx + _extrapVz * _extrapVz);
+                _target = intended;
+                _targetYaw = destYaw;
+                _velocity = new Vector3(_extrapVx, 0f, _extrapVz);
+                next.y = GroundY(next.x, next.z, next.y) + FootClearance;
+                transform.position = next;
+                if (_velocity.sqrMagnitude > 0.01f)
+                {
+                    var faceYaw = Mathf.Atan2(_extrapVx, _extrapVz) * Mathf.Rad2Deg;
+                    transform.rotation = Quaternion.Slerp(transform.rotation,
+                        Quaternion.Euler(0f, faceYaw, 0f),
+                        1f - Mathf.Exp(-renderDt * 8f));
+                }
+
+                var walkingEx = _chaseMetersPerSec > 0.05f;
+                var animTargetEx = walkingEx
+                    ? (_locomotionSpeed > 0.15f ? _locomotionSpeed : 6f)
+                    : 0f;
+                _animSpeed = Mathf.MoveTowards(_animSpeed, animTargetEx, renderDt * 8f);
+                if (_anim != null)
+                {
+                    _anim.SetBool(_groundedId, true);
+                    _anim.SetFloat(_speedId, _animSpeed);
+                    _anim.SetFloat(_motionSpeedId, _animSpeed > 0.2f ? 1f : 0f);
+                }
+
+                if (Time.unscaledTime >= _nextGroundAlignAt)
+                {
+                    _nextGroundAlignAt = Time.unscaledTime + 0.5f;
+                    AlignModelToGround();
+                }
+
+                return;
+            }
+
             if (settings.Enabled)
             {
                 var coast = settings.CoastEnabled ? settings.CoastMaxSec : 0f;

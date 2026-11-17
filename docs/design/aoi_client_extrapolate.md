@@ -1,8 +1,11 @@
-# 观察端 AOI 外推（E3 设计，未实现）
+# 观察端 AOI 外推（P1）
 
-状态：**仅设计**。等确认后再改代码。不改协议字段、不新增消息、不改心跳与移动上行。LEAVE（op=3）同一帧删模型保持不变。
+状态：**已实现（默认关）**。`GameMeshClientConfig.aoiExtrapolate`（默认 false）。关 = 现有插值/追点。  
+开时需与服务端 `GAMEMESH_AOI_EXTRAPOLATE=1` **同日升级**（同一 `schema_sha256`，无双摘要）。
 
-开关草案：`aoi_extrapolate`（`GameMeshClientConfig`，**默认 false**）。关闭 = 现有插值/追点行为（见 `aoi_client_interp.md`）。
+外推式（与联调提示一致）：
+`position + (vx,vz) * (estServerNow − **本帧 server_time_ms**) / 1000`  
+**不要**用 `move_start_ms` 当地点时间（关键帧会二次累加）。`move_start_ms≠0` 且 `|v|>ε` 才外推；`|v|≈0` 停在 position。
 
 ---
 

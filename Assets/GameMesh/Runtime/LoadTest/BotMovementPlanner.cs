@@ -390,7 +390,7 @@ namespace GameMesh.LoadTest
     /// <summary>
     /// Sparse waypoint patrol: one MOVE at depart (segment goal), optional arrive MOVE
     /// only when the server shortened the first packet. No mid-segment MOVE. No velocity
-    /// extrapolation — vx/vz/move_start_ms are not in the protocol yet.
+    /// observer extrapolation (aoiExtrapolate) — bots themselves still follow MoveRsp.
     /// </summary>
     public sealed class SparsePatrolController
     {

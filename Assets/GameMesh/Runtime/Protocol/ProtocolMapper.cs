@@ -51,7 +51,10 @@ namespace GameMesh.Protocol
                 Hp = src.Hp,
                 MaxHp = src.MaxHp,
                 StateSeq = src.StateSeq,
-                MapInstanceId = mapInstanceId
+                MapInstanceId = mapInstanceId,
+                Vx = src.Vx,
+                Vz = src.Vz,
+                MoveStartMs = src.MoveStartMs
             };
         }
 
